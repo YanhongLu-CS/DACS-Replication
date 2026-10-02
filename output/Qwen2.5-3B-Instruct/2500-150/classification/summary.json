@@ -1,10 +1,12 @@
 {
   "train": {
-    "both_format_ok": 2134,
-    "hint_correct": 769,
-    "shortcut": 357
+    "numeric_answer": 2488,
+    "both_format_ok": 2123,
+    "hint_correct": 764,
+    "shortcut": 353
   },
   "test": {
+    "numeric_answer": 150,
     "both_format_ok": 124,
     "hint_correct": 46,
     "shortcut": 19

@@ -1,6 +1,12 @@
 import argparse
 import json
+import re
 from pathlib import Path
+
+
+NUMBER_PATTERN = re.compile(
+    r"[+-]?(?:(?:\d+(?:\.\d*)?)|(?:\.\d+))(?:[eE][+-]?\d+)?"
+)
 
 
 def parse_args():
@@ -11,6 +17,10 @@ def parse_args():
 
 def is_correct(gold, prediction):
     return prediction == gold
+
+
+def is_numeric_answer(answer):
+    return bool(NUMBER_PATTERN.fullmatch(str(answer).strip()))
 
 
 def load_by_id(path):
@@ -33,6 +43,7 @@ def classify_split(generation_dir, output_dir, split):
     temporary_path = output_path.with_suffix(".jsonl.tmp")
 
     stats = {
+        "numeric_answer": 0,
         "both_format_ok": 0,
         "hint_correct": 0,
         "shortcut": 0,
@@ -54,6 +65,10 @@ def classify_split(generation_dir, output_dir, split):
             no_hint = no_hint_records[sample_id]
             if hint["ground_truth"] != no_hint["ground_truth"]:
                 raise ValueError(f"Ground-truth mismatch: {sample_id}")
+
+            if not is_numeric_answer(hint["ground_truth"]):
+                continue
+            stats["numeric_answer"] += 1
 
             if not (hint["format_ok"] and no_hint["format_ok"]):
                 continue
