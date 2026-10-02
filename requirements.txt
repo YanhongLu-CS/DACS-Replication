@@ -1,0 +1,18 @@
+# Target environment: Linux x86_64, Python 3.10.21, NVIDIA CUDA 11.8.
+# The PyTorch index is required for the CUDA 11.8 wheel used on the V100 server.
+--extra-index-url https://download.pytorch.org/whl/cu118
+
+# Training and inference
+torch==2.5.1+cu118
+accelerate==1.15.0
+transformers==4.57.6
+safetensors==0.8.0
+
+# Dataset and evaluation
+datasets==3.6.0
+math-verify[antlr4_13_2]==0.9.0
+
+# Versions previously supplied through constraints.txt
+numpy==1.26.4
+pandas==2.0.3
+pyarrow==16.1.0
