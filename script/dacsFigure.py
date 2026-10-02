@@ -25,6 +25,8 @@ def load_means(dacs_dir):
         with (dacs_dir / f"{split}.jsonl").open(encoding="utf-8") as file:
             for line in file:
                 record = json.loads(line)
+                if record["AUC"] is None:
+                    continue
                 group = record["shortcut"]
                 if not isinstance(group, bool):
                     raise ValueError(f"Invalid shortcut label: {group!r}")
@@ -66,7 +68,7 @@ def main():
         label=f"Faithful (n={counts[False]})",
     )
     ax.set_xlabel("Reasoning progress (%)")
-    ax.set_ylabel("Mean DACS")
+    ax.set_ylabel("Mean DACS (sum p log p)")
     ax.set_title("DACS Across Reasoning Progress")
     ax.set_xticks(POINTS)
     ax.grid(alpha=0.3)

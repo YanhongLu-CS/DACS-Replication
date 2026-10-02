@@ -9,27 +9,16 @@ import torch.multiprocessing as mp
 from tqdm import tqdm
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
+from generate import MODEL_PATH, build_prompt
 
-MODEL_PATH = "/data4/lyh/models/Qwen2.5-3B-Instruct"
 DEFAULT_CLASSIFICATION_DIR = Path(
     "/Users/lyh/Developer/research/WCRTE/"
     "output/Qwen2.5-3B-Instruct/2500-150/classification"
 )
 POINTS = tuple(range(0, 101, 10))
-
-SYSTEM_PROMPT = """You are Qwen, created by Alibaba Cloud.
-You are a helpful assistant.
-
-You must follow this exact output structure:
-<think>Your reasoning process</think><answer>Your final answer</answer>
-
-Rules:
-- Put all reasoning inside <think> tags.
-- Put only the final answer inside <answer> tags.
-- Do not output any text outside these tags.
-- Do not repeat the opening <think> tag.
-- Always close both tags.
-"""
+MAX_NEW_TOKENS = 10
+OUTPUT_PREFIX = "<think>\n"
+ANSWER_PREFIX = "\n</think>\n<answer>\n"
 
 
 def parse_args():
@@ -44,25 +33,27 @@ def parse_args():
     return parser.parse_args()
 
 
-def build_base_prompt(user_input, tokenizer):
-    prompt = tokenizer.apply_chat_template(
-        [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_input.rstrip()},
-        ],
-        tokenize=False,
-        add_generation_prompt=True,
-    )
-    return prompt + "<think>"
-
-
 def tokenize_record(record, tokenizer):
-    base_prompt = build_base_prompt(record["user_input"], tokenizer)
-    reasoning_ids = tokenizer.encode(
-        record["reasoning"],
+    output = record["output"]
+    if not output.startswith(OUTPUT_PREFIX):
+        raise ValueError("output does not start with '<think>\\n'.")
+    reasoning_end = output.find("</think>", len(OUTPUT_PREFIX))
+    if reasoning_end == -1:
+        raise ValueError("output does not contain '</think>'.")
+
+    reasoning = output[len(OUTPUT_PREFIX) : reasoning_end].rstrip()
+    base_prompt = build_prompt(record["user_input"], tokenizer)
+    base_ids = tokenizer.encode(
+        base_prompt,
         add_special_tokens=False,
     )
-    return base_prompt, reasoning_ids
+    full_prefix_ids = tokenizer.encode(
+        base_prompt + reasoning,
+        add_special_tokens=False,
+    )
+    if full_prefix_ids[: len(base_ids)] != base_ids:
+        raise ValueError("reasoning does not begin at a stable token boundary.")
+    return base_ids, full_prefix_ids[len(base_ids) :]
 
 
 def pad_sequences(sequences, pad_token_id, device):
@@ -82,61 +73,96 @@ def pad_sequences(sequences, pad_token_id, device):
 
 
 def confidence_at_point(tokenized, point, tokenizer, model, device):
+    answer_prefix_ids = tokenizer.encode(
+        ANSWER_PREFIX,
+        add_special_tokens=False,
+    )
     sequences = []
-    for base_prompt, reasoning_ids in tokenized:
+    for base_ids, reasoning_ids in tokenized:
         end = round(len(reasoning_ids) * point / 100)
-        partial_reasoning = tokenizer.decode(
-            reasoning_ids[:end],
-            skip_special_tokens=False,
-            clean_up_tokenization_spaces=False,
-        )
-        complete_prompt = base_prompt + partial_reasoning + "</think><answer>"
-        sequences.append(
-            tokenizer.encode(complete_prompt, add_special_tokens=False)
-        )
+        sequences.append(base_ids + reasoning_ids[:end] + answer_prefix_ids)
 
     input_ids, attention_mask = pad_sequences(
         sequences, tokenizer.pad_token_id, device
     )
-    position_ids = attention_mask.cumsum(dim=-1) - 1
-    position_ids.masked_fill_(attention_mask == 0, 0)
     with torch.inference_mode():
-        logits = model(
+        generated = model.generate(
             input_ids=input_ids,
             attention_mask=attention_mask,
-            position_ids=position_ids,
-            use_cache=False,
-            logits_to_keep=1,
-        ).logits[:, -1, :].float()
-        log_probabilities = torch.log_softmax(logits, dim=-1)
-        confidence = (
-            log_probabilities.exp() * log_probabilities
-        ).sum(dim=-1)
-    return confidence.cpu().tolist()
+            max_new_tokens=MAX_NEW_TOKENS,
+            do_sample=False,
+            repetition_penalty=1.0,
+            pad_token_id=tokenizer.pad_token_id,
+            return_dict_in_generate=True,
+            output_scores=True,
+        )
+
+    eos_ids = model.generation_config.eos_token_id
+    if eos_ids is None:
+        eos_ids = set()
+    elif isinstance(eos_ids, int):
+        eos_ids = {eos_ids}
+    else:
+        eos_ids = set(eos_ids)
+
+    input_length = input_ids.shape[1]
+    results = []
+    for row, token_ids in enumerate(generated.sequences[:, input_length:]):
+        confidence = None
+        number_step = None
+        for step, token_id in enumerate(token_ids.tolist()):
+            if token_id in eos_ids:
+                break
+            token = tokenizer.decode(
+                [token_id], clean_up_tokenization_spaces=False
+            )
+            if any(character.isdigit() for character in token):
+                log_probabilities = torch.log_softmax(
+                    generated.scores[step][row].float(), dim=-1
+                )
+                confidence = (
+                    log_probabilities.exp() * log_probabilities
+                ).sum().item()
+                number_step = step + 1
+                break
+        results.append((confidence, number_step))
+    return results
 
 
 def score_batch(records, tokenizer, model, device):
     try:
         tokenized = [tokenize_record(record, tokenizer) for record in records]
         scores = [[] for _ in records]
+        number_steps = [[] for _ in records]
         for point in POINTS:
             values = confidence_at_point(
                 tokenized, point, tokenizer, model, device
             )
-            for row_scores, value in zip(scores, values):
-                row_scores.append(value)
+            for row_scores, row_steps, (confidence, step) in zip(
+                scores, number_steps, values
+            ):
+                row_scores.append(confidence)
+                row_steps.append(step)
 
         results = []
-        for record, row_scores in zip(records, scores):
+        for record, row_scores, row_steps in zip(
+            records, scores, number_steps
+        ):
             result = dict(record)
-            for point, value in zip(POINTS, row_scores):
+            for point, value, step in zip(POINTS, row_scores, row_steps):
                 result[f"DACS_{point:02d}"] = value
-            result["AUC"] = sum(
-                (POINTS[i + 1] - POINTS[i])
-                / 100
-                * (row_scores[i] + row_scores[i + 1])
-                / 2
-                for i in range(len(POINTS) - 1)
+                result[f"DACS_{point:02d}_has_number"] = step is not None
+                result[f"DACS_{point:02d}_number_step"] = step
+            result["AUC"] = (
+                sum(
+                    (POINTS[i + 1] - POINTS[i])
+                    / 100
+                    * (row_scores[i] + row_scores[i + 1])
+                    / 2
+                    for i in range(len(POINTS) - 1)
+                )
+                if all(value is not None for value in row_scores)
+                else None
             )
             results.append(result)
         return results
