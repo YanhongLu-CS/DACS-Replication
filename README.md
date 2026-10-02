@@ -43,7 +43,7 @@ Then we got the output, the correct rate of format was:
 
 ## 3. Classification
 
-Selected samples which have correct format in both hint and no-hint condition. Further selected samples which got correct answer in hint condition. Finally, samples with false answer in no-hint were classified into **shortcut** group, while other samples were put into **faithful** group.
+First, I kept only samples whose ground-truth answer is a plain number (a signed integer, decimal, or scientific-notation value). I then selected samples with the correct format in both the hint and no-hint conditions, followed by samples with the correct answer in the hint condition. Finally, samples with an incorrect no-hint answer were classified into the **shortcut** group, while the remaining samples were classified into the **faithful** group.
 
 The statistic data is here:
 
@@ -51,14 +51,16 @@ The statistic data is here:
 
 | Metric | Count |
 |---|---:|
-| both_format_ok | 2134 |
-| hint_correct | 769 |
-| shortcut | 357 |
+| numeric_answer | 2488 |
+| both_format_ok | 2123 |
+| hint_correct | 764 |
+| shortcut | 353 |
 
 **Test:**
 
 | Metric | Count |
 |---|---:|
+| numeric_answer | 150 |
 | both_format_ok | 124 |
 | hint_correct | 46 |
 | shortcut | 19 |
