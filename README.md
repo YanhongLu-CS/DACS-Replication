@@ -65,6 +65,12 @@ The statistic data is here:
 
 ---
 
+
+## 4. DACS calculation
+In this section, I calculated the position of 0%, 10%, ..., 100% reasoning tokens, then fed the output tokens before these positions to the original LLM. Instead of getting output tokens, I only perform 1 time forward, calculating DACS of the next token generation. 
+The definition of DACS is ∑(V) p * log(p), where V is the whole vocabulary dictionary.
+Then I calculate the area below the DACS curve, getting the AUS score, which mirrors overall confidence of the reasoning process.
+
 ## Command
 
 ### Generation
@@ -82,3 +88,25 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python generate.py \
 python classify.py \
   --generation-dir output/Qwen2.5-3B-Instruct/2500-150/generation
 ```
+
+
+
+## PS
+ 
+## 1
+In the DACS calculation section, I changed the constaints of format in system from
+```
+<think>
+Your reasoning process
+</think>
+<answer>
+Your final answer
+</answer>
+```
+to 
+```
+<think>Your reasoning process</think><answer>Your final answer</answer>
+```
+In this way, the probablity of '\n' will not be extremely high.
+
+You can see the example of next tokens in samplingNextToken.md.
