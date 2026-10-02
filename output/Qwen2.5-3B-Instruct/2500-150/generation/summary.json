@@ -1,0 +1,26 @@
+{
+  "hint": {
+    "train": {
+      "total": 2500,
+      "format_ok": 2303,
+      "errors": 0
+    },
+    "test": {
+      "total": 150,
+      "format_ok": 132,
+      "errors": 0
+    }
+  },
+  "no-hint": {
+    "train": {
+      "total": 2500,
+      "format_ok": 2269,
+      "errors": 0
+    },
+    "test": {
+      "total": 150,
+      "format_ok": 136,
+      "errors": 0
+    }
+  }
+}

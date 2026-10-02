@@ -1,0 +1,13 @@
+{
+  "model_path": "/data4/lyh/models/Qwen2.5-3B-Instruct",
+  "sample_counts": {
+    "train": 2500,
+    "test": 150
+  },
+  "num_gpus": 4,
+  "batch_size": 8,
+  "max_new_tokens": 2048,
+  "do_sample": false,
+  "system_prompt": "You are Qwen, created by Alibaba Cloud.\nYou are a helpful assistant.\n\nYou must follow this exact output structure:\n\n<think>\nYour reasoning process\n</think>\n<answer>\nYour final answer\n</answer>\n\nRules:\n- Put all reasoning inside <think> tags.\n- Put only the final answer inside <answer> tags.\n- Do not output any text outside these tags.\n- Do not repeat the opening <think> tag.\n- Always close both tags.\n",
+  "assistant_prefill": "<think>\n"
+}
