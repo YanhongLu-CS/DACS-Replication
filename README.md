@@ -69,12 +69,22 @@ The statistic data is here:
 
 
 ## 4. DACS calculation
-In this section, I calculated the position of 0%, 10%, ..., 100% reasoning tokens, then fed the output tokens before these positions to the original LLM. Instead of getting output tokens, I only perform 1 time forward, calculating DACS of the next token generation. 
-The definition of DACS is ∑(V) p * log(p), where V is the whole vocabulary dictionary.
-Then I calculate the area below the DACS curve, getting the AUS score, which mirrors overall confidence of the reasoning process.
 
-## 5. AUROC calculation and DACS visulization
-I calculated AUROC of samples I selected, which was 0.5225. Then I drew the DACS curve, which can be found at output/Qwen2.5-3B-Instruct/2500-150/figures/dacs_mean_curves.png.
+For each sample, I truncated the generated reasoning at 0%, 10%, ..., 100% of its tokens. At each checkpoint, I appended `\n</think>\n<answer>\n` and greedily generated up to 10 tokens. When the first token containing a digit was generated, I calculated DACS from the preceding next-token distribution over the entire vocabulary as `sum(p * log(p))`.
+
+A sample is valid only when a numeric token is found within 10 steps at all 11 checkpoints. Its AUC is calculated using the trapezoidal rule over the DACS curve.
+
+| Split | Total | Valid | Invalid |
+|---|---:|---:|---:|
+| Train | 764 | 521 | 243 |
+| Test | 46 | 29 | 17 |
+| Combined | 810 | 550 | 260 |
+
+## 5. AUROC calculation and DACS visualization
+
+Among the 550 valid samples, 254 are shortcut samples and 296 are faithful samples. Using the proportion of shortcut-faithful pairs satisfying `AUC(shortcut) < AUC(faithful)`, the AUROC is **0.5626**.
+
+![Mean DACS across reasoning progress](output/Qwen2.5-3B-Instruct/2500-150/figures/dacs_mean_curves.png)
 
 ## Command
 
@@ -89,29 +99,17 @@ CUDA_VISIBLE_DEVICES=0,1,2,3 python generate.py \
 ```
 
 ### Classification
+
 ```bash
 python classify.py \
   --generation-dir output/Qwen2.5-3B-Instruct/2500-150/generation
 ```
 
+### DACS calculation
 
-
-## PS
- 
-## 1
-In the DACS calculation section, I changed the constaints of format in system from
+```bash
+CUDA_VISIBLE_DEVICES=0,1,2,3 python DACS.py \
+  --num-gpus 4 \
+  --batch-size 8 \
+  --classification-dir output/Qwen2.5-3B-Instruct/2500-150/classification
 ```
-<think>
-Your reasoning process
-</think>
-<answer>
-Your final answer
-</answer>
-```
-to 
-```
-<think>Your reasoning process</think><answer>Your final answer</answer>
-```
-In this way, the probablity of '\n' will not be extremely high.
-
-You can see the example of next tokens in samplingNextToken.md.
