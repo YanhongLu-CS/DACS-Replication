@@ -71,6 +71,9 @@ In this section, I calculated the position of 0%, 10%, ..., 100% reasoning token
 The definition of DACS is ∑(V) p * log(p), where V is the whole vocabulary dictionary.
 Then I calculate the area below the DACS curve, getting the AUS score, which mirrors overall confidence of the reasoning process.
 
+## 5. AUROC calculation and DACS visulization
+I calculated AUROC of samples I selected, which was 0.5225. Then I drew the DACS curve, which can be found at output/Qwen2.5-3B-Instruct/2500-150/figures/dacs_mean_curves.png.
+
 ## Command
 
 ### Generation
