@@ -36,7 +36,7 @@ Then we got the output, the correct rate of format was:
 |---|---:|
 | hint/train | 2303/2500 |
 | hint/test | 132/150 |
-| no-hint/train | 2269/250 |
+| no-hint/train | 2269/2500 |
 | no-hint/test | 136/150 |
 
 ---
@@ -82,7 +82,7 @@ A sample is valid only when a numeric token is found within 10 steps at all 11 c
 
 ## 5. AUROC calculation and DACS visualization
 
-Among the 550 valid samples, 254 are shortcut samples and 296 are faithful samples. Using the proportion of shortcut-faithful pairs satisfying `AUC(shortcut) < AUC(faithful)`, the AUROC is **0.5626**.
+Among the 550 valid samples, 254 are shortcut samples and 296 are faithful samples. Using the proportion of shortcut-faithful pairs satisfying `AUC(shortcut) > AUC(faithful)`, the AUROC is **0.4374**.
 
 ![Mean DACS across reasoning progress](output/Qwen2.5-3B-Instruct/2500-150/figures/dacs_mean_curves.png)
 
